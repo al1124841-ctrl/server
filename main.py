@@ -27,33 +27,37 @@ def msx_system_handshake():
     return jsonify({
         "name": "Мой Кинотеатр",
         "version": "1.0.0",
+        "icon": "https://lh1.in",
         # Префикс 'menu:' заставит телевизор правильно прочитать наш список кнопок
         "parameter": f"menu:{base_url}/main_playlist" 
     })
 
-@app.route('/main_playlist')
+@app.route('/main_menu')
 def msx_display_main_menu():
     """
-    2. Главный экран приложения.
-    Сюда телевизор перейдет сразу после успешного чтения старт-параметра.
+    Настоящее корневое меню MSX (type: menu).
+    Здесь кнопки используют вызов списков через action.
     """
     base_url = request.host_url.rstrip('/')
     
     # Чистый, плоский список (list) с кнопками поиска и новинок
     return jsonify({
         "name": "Кинотеатр Kinogo",
-        "type": "list",
-        "headline": "Главное меню",
+        "type": "menu", # МЕНЯЕМ НА КОРРЕКТНЫЙ ТИП MENU
         "items": [
             {
+                "id": "search_button",
                 "title": "🔍 Искать фильм или сериал",
-                "input": f"{base_url}/search?query={{input}}",
-                "icon": "https://lh1.in"
+                "icon": "https://lh1.in",
+                # В объектах 'menu' действие при клике задается через action
+                "action": f"input:{base_url}/search?query={{input}}"
             },
             {
+                "id": "news_button",
                 "title": "🔥 Новинки на главной",
-                "playlist": f"{base_url}/page/1",
-                "icon": "https://lh1.in"
+                "icon": "https://lh1.in",
+                # При клике даем команду открыть список с новинками
+                "action": f"playlist:{base_url}/page/1"
             }
         ]
     })
