@@ -35,21 +35,20 @@ def get_player_tokens(embed_url):
 
 @app.route('/')
 @app.route('/msx/start.json')
-def main_menu():
-    """Главное меню с поиском и категориями"""
+def msx_system_handshake():
+    """Системный ответ для первой авторизации телевизора в MSX"""
     base_url = request.host_url.rstrip('/')
     
-        # MSX строго требует параметр 'version' при первом запуске
     return jsonify({
         "name": "Мой Кинотеатр",
-        "version": "1.0.0",  # ВОТ ЭТОТ ПАРАМЕТР ИСПРАВИТ ОШИБКУ!
+        "version": "1.0.0",
         "icon": "https://lh1.in",
-        "menu": f"{base_url}/menu"  # Ссылка, которая откроет само меню
+        "menu": f"{base_url}/tv_menu"  # Перенаправляем на уникальный роут
     })
 
-@app.route('/menu')
+@app.route('/tv_menu')
 @app.route('/tv')
-def main_menu():
+def msx_display_main_menu():
     """Само главное меню с поиском и новинками"""
     base_url = request.host_url.rstrip('/')
     
@@ -69,6 +68,7 @@ def main_menu():
         ]
     }
     return jsonify(msx_json)
+
 
 @app.route('/search')
 @app.route('/page/<int:page_num>')
