@@ -12,69 +12,80 @@ HEADERS = {
     "Referer": HOST + "/"
 }
 
-# --- ПОЛНОСТЬЮ СКОРРЕКТИРОВАННЫЙ БЛОК АВТОРИЗАЦИИ И МЕНЮ ---
+# ==============================================================================
+# 1. СИСТЕМНЫЙ БЛОК АВТОРИЗАЦИИ И МЕНЮ (СТАНДАРТ MSX API)
+# ==============================================================================
 
 @app.route('/')
 @app.route('/msx/start.json')
 def msx_system_handshake():
-    """
-    1. Системный ответ (Start Object). 
-    Он ТОЛЬКО авторизует телевизор и указывает, куда идти дальше.
-    """
+    """Служебный старт. Авторизует ТВ и направляет его на корневое меню."""
     base_url = request.host_url.rstrip('/')
-    
-    # Эти три поля строго обязательны в первом файле по документации MSX!
     return jsonify({
         "name": "Мой Кинотеатр",
         "version": "1.0.0",
         "icon": "https://lh1.in",
-        # Префикс 'menu:' заставит телевизор правильно прочитать наш список кнопок
-        "parameter": f"menu:{base_url}/main_playlist" 
+        "parameter": f"menu:{base_url}/main_menu"  # Вызываем тип 'menu'
     })
 
 @app.route('/main_menu')
+@app.route('/tv_menu')
+@app.route('/tv_playlist')
 def msx_display_main_menu():
     """
-    Настоящее корневое меню MSX (type: menu).
-    Здесь кнопки используют вызов списков через action.
+    Корневое меню приложения. Использует свойство 'data'
+    для полной совместимости с плеером Samsung Smart TV.
     """
     base_url = request.host_url.rstrip('/')
-    
-    # Чистый, плоский список (list) с кнопками поиска и новинок
     return jsonify({
         "name": "Кинотеатр Kinogo",
-        "type": "menu", # МЕНЯЕМ НА КОРРЕКТНЫЙ ТИП MENU
+        "type": "menu",  # Задаем системный тип меню
         "items": [
             {
-                "id": "search_button",
                 "title": "🔍 Искать фильм или сериал",
                 "icon": "https://lh1.in",
-                # В объектах 'menu' действие при клике задается через action
-                "action": f"input:{base_url}/search?query={{input}}"
+                "data": f"{base_url}/search_page"  # Ведет на страницу ввода текста
             },
             {
-                "id": "news_button",
                 "title": "🔥 Новинки на главной",
                 "icon": "https://lh1.in",
-                # При клике даем команду открыть список с новинками
-                "action": f"playlist:{base_url}/page/1"
+                "data": f"{base_url}/page/1"  # Ведет на список новинок
             }
         ]
     })
-    return jsonify(msx_json)
 
-# --- ОСТАЛЬНОЙ ФУНКЦИОНАЛ ПАРСИНГА САЙТА ---
+@app.route('/search_page')
+def msx_search_page():
+    """Промежуточный экран, который активирует клавиатуру ввода на ТВ."""
+    base_url = request.host_url.rstrip('/')
+    return jsonify({
+        "type": "list",
+        "items": [
+            {
+                "title": "Нажмите ОК для ввода названия",
+                "input": f"{base_url}/search?query={{input}}",
+                "icon": "https://lh1.in"
+            }
+        ]
+    })
+
+# ==============================================================================
+# 2. БЛОК ПАРСИНГА САЙТА KINOGO (КАТАЛОГ И ПОИСК)
+# ==============================================================================
 
 def get_player_tokens(embed_url):
+    """Вытаскивает динамические токены времени и пути из плеера cinemap."""
     try:
         if embed_url.startswith('//'):
             embed_url = 'https:' + embed_url
         res = requests.get(embed_url, headers=HEADERS, timeout=5)
+        
         token_match = re.search(r'([a-f0-9]{32}:\d{10})', res.text)
         path_match = re.search(r'tvseries/([a-f0-9]{40})', res.text)
         movie_match = re.search(r'vod/([a-f0-9]{40})', res.text)
         
         token = token_match.group(1) if token_match else "default_token"
+        
         if path_match:
             return token, f"tvseries/{path_match.group(1)}"
         elif movie_match:
@@ -86,12 +97,19 @@ def get_player_tokens(embed_url):
 @app.route('/search')
 @app.route('/page/<int:page_num>')
 def list_movies(page_num=1):
+    """Выводит сетку фильмов (с главной страницы или результатов поиска)."""
     base_url = request.host_url.rstrip('/')
     query = request.args.get('query')
     
     if query:
         search_url = f"{HOST}/index.php?do=search"
-        data = {"do": "search", "subaction": "search", "search_start": page_num, "full_search": 0, "story": query}
+        data = {
+            "do": "search",
+            "subaction": "search",
+            "search_start": page_num,
+            "full_search": 0,
+            "story": query
+        }
         response = requests.post(search_url, headers=HEADERS, data=data, timeout=10)
     else:
         url = f"{HOST}/page/{page_num}/" if page_num > 1 else HOST
@@ -121,14 +139,18 @@ def list_movies(page_num=1):
                 "playlist": f"{base_url}/movie?url={encoded_url}"
             })
             
+    # Кнопка перехода на следующую страницу контента
+    next_page = page_num + 1
+    next_url = f"{base_url}/search?query={query}&page={next_page}" if query else f"{base_url}/page/{next_page}"
     msx_json["items"].append({
         "title": "➡️ Следующая страница",
-        "playlist": f"{base_url}/search?query={query}&page={page_num+1}" if query else f"{base_url}/page/{page_num+1}"
+        "playlist": next_url
     })
     return jsonify(msx_json)
 
 @app.route('/movie')
 def movie_detail():
+    """Определяет тип контента (фильм/сериал) и генерирует ссылки на видео."""
     base_url = request.host_url.rstrip('/')
     movie_url = urllib.parse.unquote_plus(request.args.get('url'))
     
@@ -143,22 +165,24 @@ def movie_detail():
         iframe_url = iframe['src']
         
     if not iframe_url:
-        return jsonify({"name": "Ошибка", "items": [{"title": "Плеер не найден"}]})
+        return jsonify({"name": "Ошибка", "type": "list", "items": [{"title": "Плеер не найден"}]})
 
     token, video_path = get_player_tokens(iframe_url)
     if not video_path:
-        return jsonify({"name": "Ошибка", "items": [{"title": "Не удалось распознать поток"}]})
+        return jsonify({"name": "Ошибка", "type": "list", "items": [{"title": "Не удалось распознать поток"}]})
 
     is_creative_series = "tvseries" in video_path or "season" in res.text.lower() or "серия" in res.text.lower()
     msx_json = {"name": "Выбор контента", "type": "list", "items": []}
     
     if is_creative_series:
+        # Если сериал — строим сетку из 4 сезонов (универсальный шаблон)
         for s in range(1, 5): 
             msx_json["items"].append({
                 "title": f"Сезон {s}",
                 "playlist": f"{base_url}/series-episodes?path={urllib.parse.quote_plus(video_path)}&token={token}&season={s}"
             })
     else:
+        # Если фильм — выводим доступные качества видеофайла
         msx_json["items"] = [
             {"title": "Смотреть в 1080p", "video": f"https://cinemap.cc{token}/{video_path}/1080.mp4"},
             {"title": "Смотреть в 720p", "video": f"https://cinemap.cc{token}/{video_path}/720.mp4"},
@@ -168,11 +192,13 @@ def movie_detail():
 
 @app.route('/series-episodes')
 def series_episodes():
+    """Выводит список серий для выбранного сезона сериала."""
     path = urllib.parse.unquote_plus(request.args.get('path'))
     token = request.args.get('token')
     season = request.args.get('season')
     
     msx_json = {"name": f"Сезон {season}", "type": "list", "items": []}
+    # Генерируем стандартный список на 24 серии
     for ep in range(1, 25):
         msx_json["items"].append({
             "title": f"Серия {ep}",
