@@ -31,25 +31,29 @@ def msx_system_handshake():
 @app.route('/tv_menu')
 @app.route('/tv')
 def msx_display_main_menu():
-    """Главный экран приложения (сделан в виде списка/страницы)"""
+    """Главный экран приложения, обернутый по правилам контента MSX"""
     base_url = request.host_url.rstrip('/')
     
+    # MSX требует, чтобы при передаче через 'content:' 
+    # вся структура плейлиста/списка лежала строго внутри ключа 'content'
     msx_json = {
-        "name": "Кинотеатр Kinogo",
-        "type": "list", # Базовый и самый стабильный тип
-        "headline": "Главное меню",
-        "items": [
-            {
-                "title": "🔍 Искать фильм или сериал",
-                "input": f"{base_url}/search?query={{input}}",
-                "icon": "https://lh1.in"
-            },
-            {
-                "title": "🔥 Новинки на главной",
-                "playlist": f"{base_url}/page/1",
-                "icon": "https://lh1.in"
-            }
-        ]
+        "content": {
+            "name": "Кинотеатр Kinogo",
+            "type": "list",
+            "headline": "Главное меню",
+            "items": [
+                {
+                    "title": "🔍 Искать фильм или сериал",
+                    "input": f"{base_url}/search?query={{input}}",
+                    "icon": "https://lh1.in"
+                },
+                {
+                    "title": "🔥 Новинки на главной",
+                    "playlist": f"{base_url}/page/1",
+                    "icon": "https://lh1.in"
+                }
+            ]
+        }
     }
     return jsonify(msx_json)
 
