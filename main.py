@@ -19,42 +19,44 @@ HEADERS = {
 def msx_system_handshake():
     """
     Системный ответ для Media Station X.
-    Говорит телевизору: 'Всё ок, загрузи плейлист по этой ссылке'.
+    Выполняем строгое требование ТВ: используем префикс 'content:'
     """
     base_url = request.host_url.rstrip('/')
     
-    # Свойство 'parameter' указывает, какую команду выполнить при старте.
-    # Команда 'playlist:' заставит MSX открыть обычный, стабильный список папок.
+    # Теперь параметр СТРОГО соответствует правилу 'content:URL'
     return jsonify({
         "name": "Мой Кинотеатр",
         "version": "1.0.0",
         "icon": "https://lh1.in",
-        "parameter": f"playlist:{base_url}/tv_playlist" # Ссылка на наше меню
+        "parameter": f"content:{base_url}/tv_content" 
     })
 
-@app.route('/tv_playlist')
+@app.route('/tv_content')
 @app.route('/tv')
 def msx_display_main_menu():
-    """Само главное меню, оформленное в виде классического списка MSX"""
+    """Главный экран приложения, обернутый в правильный для content-запроса JSON"""
     base_url = request.host_url.rstrip('/')
     
-    msx_json = {
-        "name": "Кинотеатр Kinogo",
-        "type": "list", # Классический плиточный интерфейс
-        "headline": "Главное меню",
-        "items": [
-            {
-                "title": "🔍 Искать фильм или сериал",
-                "input": f"{base_url}/search?query={{input}}",
-                "icon": "https://lh1.in"
-            },
-            {
-                "title": "🔥 Новинки на главной",
-                "playlist": f"{base_url}/page/1",
-                "icon": "https://lh1.in"
-            }
-        ]
-    }
+    # Когда ТВ вызывает 'content:URL', ответ должен содержать корневой ключ 'content'
+    return jsonify({
+        "content": {
+            "name": "Кинотеатр Kinogo",
+            "type": "list",
+            "headline": "Главное меню",
+            "items": [
+                {
+                    "title": "🔍 Искать фильм или сериал",
+                    "input": f"{base_url}/search?query={{input}}",
+                    "icon": "https://lh1.in"
+                },
+                {
+                    "title": "🔥 Новинки на главной",
+                    "playlist": f"{base_url}/page/1",
+                    "icon": "https://lh1.in"
+                }
+            ]
+        }
+    })
     return jsonify(msx_json)
 
 # --- ОСТАЛЬНОЙ ФУНКЦИОНАЛ ПАРСИНГА САЙТА ---
