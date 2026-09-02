@@ -17,13 +17,9 @@ HEADERS = {
 @app.route('/')
 @app.route('/msx/start.json')
 def msx_system_handshake():
-    """
-    Системный ответ для Media Station X.
-    Выполняем строгое требование ТВ: используем префикс 'content:'
-    """
+    """System response for Media Station X authorization"""
     base_url = request.host_url.rstrip('/')
     
-    # Теперь параметр СТРОГО соответствует правилу 'content:URL'
     return jsonify({
         "name": "Мой Кинотеатр",
         "version": "1.0.0",
@@ -34,28 +30,27 @@ def msx_system_handshake():
 @app.route('/tv_content')
 @app.route('/tv')
 def msx_display_main_menu():
-    """Главный экран приложения, обернутый в правильный для content-запроса JSON"""
+    """The root main menu layout sent directly as a flat list object"""
     base_url = request.host_url.rstrip('/')
     
-    # Когда ТВ вызывает 'content:URL', ответ должен содержать корневой ключ 'content'
+    # We removed the wrapping "content" key. 
+    # MSX reads this flat structure immediately without any parsing issues.
     return jsonify({
-        "content": {
-            "name": "Кинотеатр Kinogo",
-            "type": "list",
-            "headline": "Главное меню",
-            "items": [
-                {
-                    "title": "🔍 Искать фильм или сериал",
-                    "input": f"{base_url}/search?query={{input}}",
-                    "icon": "https://lh1.in"
-                },
-                {
-                    "title": "🔥 Новинки на главной",
-                    "playlist": f"{base_url}/page/1",
-                    "icon": "https://lh1.in"
-                }
-            ]
-        }
+        "name": "Кинотеатр Kinogo",
+        "type": "list",
+        "headline": "Главное меню",
+        "items": [
+            {
+                "title": "🔍 Искать фильм или сериал",
+                "input": f"{base_url}/search?query={{input}}",
+                "icon": "https://lh1.in"
+            },
+            {
+                "title": "🔥 Новинки на главной",
+                "playlist": f"{base_url}/page/1",
+                "icon": "https://lh1.in"
+            }
+        ]
     })
     return jsonify(msx_json)
 
