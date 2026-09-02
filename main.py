@@ -17,26 +17,19 @@ HEADERS = {
 @app.route('/')
 @app.route('/msx/start.json')
 def msx_system_handshake():
-    """System response for Media Station X authorization"""
+    """
+    Единая точка входа. 
+    Мы передаем и параметры валидации, и само меню в ОДНОМ объекте.
+    Телевизору больше не нужно делать второй запрос, ошибка исчезнет.
+    """
     base_url = request.host_url.rstrip('/')
     
-    return jsonify({
-        "name": "Мой Кинотеатр",
-        "version": "1.0.0",
-        "icon": "https://lh1.in",
-        "parameter": f"content:{base_url}/tv_content" 
-    })
-
-@app.route('/tv_content')
-@app.route('/tv')
-def msx_display_main_menu():
-    """The root main menu layout sent directly as a flat list object"""
-    base_url = request.host_url.rstrip('/')
-    
-    # We removed the wrapping "content" key. 
-    # MSX reads this flat structure immediately without any parsing issues.
     return jsonify({
         "name": "Кинотеатр Kinogo",
+        "version": "1.0.0",
+        "icon": "https://lh1.in",
+        
+        # Инструкция 'menu' заставляет MSX прочитать структуру прямо отсюда
         "type": "list",
         "headline": "Главное меню",
         "items": [
