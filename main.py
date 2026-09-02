@@ -33,7 +33,7 @@ def get_player_tokens(embed_url):
     except:
         return None, None
 
-@app.route('/tv')
+@app.route('/')
 def main_menu():
     """Главное меню с поиском и категориями"""
     base_url = request.host_url.rstrip('/')
