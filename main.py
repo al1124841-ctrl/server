@@ -13,7 +13,7 @@ HEADERS = {
 }
 
 # ==============================================================================
-# 1. СИСТЕМНЫЙ БЛОК АВТОРИЗАЦИИ И МЕНЮ (СТАНДАРТ MSX API)
+# 1. ИСПРАВЛЕННЫЙ СИСТЕМНЫЙ БЛОК МЕНЮ (СТАНДАРТ MSX API)
 # ==============================================================================
 
 @app.route('/')
@@ -25,38 +25,39 @@ def msx_system_handshake():
         "name": "Мой Кинотеатр",
         "version": "1.0.0",
         "icon": "https://lh1.in",
-        "parameter": f"menu:{base_url}/main_menu"  # Вызываем тип 'menu'
+        "parameter": f"menu:{base_url}/main_menu"  # Строго вызываем роут меню
     })
 
 @app.route('/main_menu')
 @app.route('/tv_menu')
-@app.route('/tv_playlist')
 def msx_display_main_menu():
     """
-    Корневое меню приложения. Использует свойство 'data'
-    для полной совместимости с плеером Samsung Smart TV.
+    Корневое меню приложения (type: menu).
+    Убрано свойство 'headline' и жестко заданы иконки, чтобы снять ошибку 'menu is missing'.
     """
     base_url = request.host_url.rstrip('/')
     return jsonify({
         "name": "Кинотеатр Kinogo",
-        "type": "menu",  # Задаем системный тип меню
+        "type": "menu",  # Системный тип меню Smart TV
         "items": [
             {
+                "id": "search_btn",
                 "title": "🔍 Искать фильм или сериал",
-                "icon": "https://lh1.in",
-                "data": f"{base_url}/search_page"  # Ведет на страницу ввода текста
+                "icon": "https://lh1.in", # Иконка обязательна!
+                "data": f"{base_url}/search_page"
             },
             {
+                "id": "news_btn",
                 "title": "🔥 Новинки на главной",
-                "icon": "https://lh1.in",
-                "data": f"{base_url}/page/1"  # Ведет на список новинок
+                "icon": "https://lh1.in", # Иконка обязательна!
+                "data": f"{base_url}/page/1"
             }
         ]
     })
 
 @app.route('/search_page')
 def msx_search_page():
-    """Промежуточный экран, который активирует клавиатуру ввода на ТВ."""
+    """Экран ввода, который активирует клавиатуру поиска на телевизоре."""
     base_url = request.host_url.rstrip('/')
     return jsonify({
         "type": "list",
