@@ -13,13 +13,13 @@ HEADERS = {
 }
 
 # ==============================================================================
-# 1. ЗАФИКСИРОВАННЫЙ РАБОЧИЙ БЛОК МЕНЮ (НЕ ИЗМЕНЯЛСЯ, ОСТАВЛЯЕМ КАК ЕСТЬ)
+# 1. THE STABLE WORKING MENU CONFIGURATION (KEEPS YOUR TWO WORKING ICONS)
 # ==============================================================================
 
 @app.route('/')
 @app.route('/msx/start.json')
 def msx_system_handshake():
-    """Служебный старт. Авторизует ТВ и направляет его на корневое меню."""
+    """Initial system handshake. Points MSX directly to the menu object."""
     base_url = request.host_url.rstrip('/')
     return jsonify({
         "name": "Мой Кинотеатр",
@@ -31,7 +31,7 @@ def msx_system_handshake():
 @app.route('/main_menu')
 @app.route('/tv_menu')
 def msx_display_main_menu():
-    """Корневое меню приложения (этот блок успешно отображает иконки на ТВ)."""
+    """Root application menu structure. This part successfully rendered your icons."""
     base_url = request.host_url.rstrip('/')
     return jsonify({
         "name": "Кинотеатр Kinogo",
@@ -53,15 +53,15 @@ def msx_display_main_menu():
     })
 
 # ==============================================================================
-# 2. ИСПРАВЛЕННЫЙ БЛОК ВЫДАЧИ КОНТЕНТА (ОБЕРНУТ В КЛЮЧ PLAYLIST ДЛЯ СНЯТИЯ ОШИБКИ)
+# 2. FIXED CONTENT ENDPOINTS (WRAPPED TO FIX 'CONTENT NOT AVAILABLE')
 # ==============================================================================
 
 @app.route('/search_page')
 def msx_search_page():
-    """Экран ввода, который активирует клавиатуру поиска внутри вкладки меню."""
+    """Generates the input option panel inside the search menu tab."""
     base_url = request.host_url.rstrip('/')
     return jsonify({
-        "playlist": {
+        "content": {
             "name": "Поиск по сайту",
             "type": "list",
             "items": [
@@ -77,7 +77,7 @@ def msx_search_page():
 @app.route('/search')
 @app.route('/page/<int:page_num>')
 def list_movies(page_num=1):
-    """Выводит сетку фильмов, упакованную в объект playlist для вкладки меню."""
+    """Parses movie grids and delivers them nested properly inside a 'content' object."""
     base_url = request.host_url.rstrip('/')
     query = request.args.get('query')
     
@@ -98,12 +98,7 @@ def list_movies(page_num=1):
     soup = BeautifulSoup(response.text, 'html.parser')
     items = soup.find_all('div', class_='shortstory') or soup.find_all('div', class_='zagolovki')
     
-    # Создаем внутреннее наполнение списка фильмов
-    playlist_content = {
-        "name": f"Поиск: {query}" if query else f"Страница {page_num}",
-        "type": "list",
-        "items": []
-    }
+    movie_items = []
     
     for item in items:
         link_tag = item.find('a')
@@ -114,32 +109,36 @@ def list_movies(page_num=1):
             img_url = HOST + img_tag['src'] if img_tag['src'].startswith('/') else img_tag['src']
             encoded_url = urllib.parse.quote_plus(movie_url)
             
-            playlist_content["items"].append({
+            movie_items.append({
                 "title": title,
                 "icon": img_url,
                 "playlist": f"{base_url}/movie?url={encoded_url}"
             })
             
-    # Кнопка перехода на следующую страницу контента
+    # Next page navigation element
     next_page = page_num + 1
     next_url = f"{base_url}/search?query={query}&page={next_page}" if query else f"{base_url}/page/{next_page}"
-    playlist_content["items"].append({
+    movie_items.append({
         "title": "➡️ Следующая страница",
         "playlist": next_url
     })
     
-    # Передаем данные строго внутри ключа 'playlist', чтобы вкладка меню ожила
+    # Crucial layout structure: wrapped inside 'content' for tab items compatibility
     return jsonify({
-        "playlist": playlist_content
+        "content": {
+            "name": f"Поиск: {query}" if query else f"Страница {page_num}",
+            "type": "list",
+            "items": movie_items
+        }
     })
 
 # ==============================================================================
-# 3. БЛОК ДЕТАЛИЗАЦИИ ФИЛЬМА И ВЫБОРА СЕРИЙ/КАЧЕСТВА
+# 3. MOVIE RESOLUTION & EPISODES SELECTION
 # ==============================================================================
 
 @app.route('/movie')
 def movie_detail():
-    """Определяет тип контента (фильм/сериал) и генерирует ссылки на видео."""
+    """Parses streaming sources and maps qualities/seasons."""
     base_url = request.host_url.rstrip('/')
     movie_url = urllib.parse.unquote_plus(request.args.get('url'))
     
@@ -179,7 +178,7 @@ def movie_detail():
 
 @app.route('/series-episodes')
 def series_episodes():
-    """Выводит список серий для выбранного сезона сериала."""
+    """Generates standard list of episodes for multi-season titles."""
     path = urllib.parse.unquote_plus(request.args.get('path'))
     token = request.args.get('token')
     season = request.args.get('season')
