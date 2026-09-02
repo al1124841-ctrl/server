@@ -52,29 +52,32 @@ def msx_display_main_menu():
     })
 
 # ==============================================================================
-# 2. ОРИГИНАЛЬНЫЙ БЛОК ВЫДАЧИ КОНТЕНТА ВО ВКЛАДКАХ
+# 2. ИСПРАВЛЕННЫЙ БЛОК ВЫДАЧИ КОНТЕНТА (ОБЕРНУТ В PAGES ДЛЯ ОТОБРАЖЕНИЯ СПРАВА)
 # ==============================================================================
 
 @app.route('/search_page')
 def msx_search_page():
     """Экран, открывающий клавиатуру поиска на телевизоре."""
     base_url = request.host_url.rstrip('/')
+    
+    # Для вкладок меню оборачиваем структуру в корневой объект 'pages'
     return jsonify({
-        "headline": "Поиск по сайту",
-        "type": "list",
-        "items": [
-            {
-                "title": "Нажмите ОК для ввода названия",
-                "input": f"{base_url}/search?query={{input}}",
-                "icon": "https://lh1.in"
-            }
-        ]
+        "pages": [{
+            "headline": "Поиск по сайту",
+            "items": [
+                {
+                    "title": "Нажмите ОК для ввода названия",
+                    "input": f"{base_url}/search?query={{input}}",
+                    "icon": "https://lh1.in"
+                }
+            ]
+        }]
     })
 
 @app.route('/search')
 @app.route('/page/<int:page_num>')
 def list_movies(page_num=1):
-    """Выводит стандартную сетку фильмов в виде списка."""
+    """Выводит стандартную сетку фильмов в формате, который понимает правая панель."""
     base_url = request.host_url.rstrip('/')
     query = request.args.get('query')
     
@@ -95,11 +98,7 @@ def list_movies(page_num=1):
     soup = BeautifulSoup(response.text, 'html.parser')
     items = soup.find_all('div', class_='shortstory') or soup.find_all('div', class_='zagolovki')
     
-    msx_json = {
-        "headline": f"Поиск: {query}" if query else f"Страница {page_num}",
-        "type": "list",
-        "items": []
-    }
+    movie_items = []
     
     for item in items:
         link_tag = item.find('a')
@@ -110,7 +109,7 @@ def list_movies(page_num=1):
             img_url = HOST + img_tag['src'] if img_tag['src'].startswith('/') else img_tag['src']
             encoded_url = urllib.parse.quote_plus(movie_url)
             
-            msx_json["items"].append({
+            movie_items.append({
                 "title": title,
                 "icon": img_url,
                 "playlist": f"{base_url}/movie?url={encoded_url}"
@@ -119,11 +118,18 @@ def list_movies(page_num=1):
     # Кнопка перехода на следующую страницу
     next_page = page_num + 1
     next_url = f"{base_url}/search?query={query}&page={next_page}" if query else f"{base_url}/page/{next_page}"
-    msx_json["items"].append({
+    movie_items.append({
         "title": "➡️ Следующая страница",
         "playlist": next_url
     })
-    return jsonify(msx_json)
+    
+    # Оборачиваем массив в корневой ключ 'pages' — это стандарт MSX для вкладок меню
+    return jsonify({
+        "pages": [{
+            "headline": f"Поиск: {query}" if query else f"Страница {page_num}",
+            "items": movie_items
+        }]
+    })
 
 # ==============================================================================
 # 3. БЛОК ОПРЕДЕЛЕНИЯ ФИЛЬМА / СЕРИАЛА И ПЛЕЕРА
