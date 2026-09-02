@@ -13,7 +13,7 @@ HEADERS = {
 }
 
 # ==============================================================================
-# 1. ИСПРАВЛЕННЫЙ СИСТЕМНЫЙ БЛОК МЕНЮ (СТАНДАРТ MSX API)
+# 1. СИСТЕМНЫЙ БЛОК АВТОРИЗАЦИИ И МЕНЮ (СТРОГО ПО ДОКУМЕНТАЦИИ MSX WIKI)
 # ==============================================================================
 
 @app.route('/')
@@ -25,31 +25,31 @@ def msx_system_handshake():
         "name": "Мой Кинотеатр",
         "version": "1.0.0",
         "icon": "https://lh1.in",
-        "parameter": f"menu:{base_url}/main_menu"  # Строго вызываем роут меню
+        "parameter": f"menu:{base_url}/main_menu"  # Переход на меню
     })
 
 @app.route('/main_menu')
 @app.route('/tv_menu')
 def msx_display_main_menu():
     """
-    Корневое меню приложения (type: menu).
-    Убрано свойство 'headline' и жестко заданы иконки, чтобы снять ошибку 'menu is missing'.
+    Корневое меню приложения (Menu Root Object).
+    ИСПРАВЛЕНО: Вместо 'items' используется 'menu' согласно правилам MSX API.
     """
     base_url = request.host_url.rstrip('/')
     return jsonify({
         "name": "Кинотеатр Kinogo",
-        "type": "menu",  # Системный тип меню Smart TV
-        "items": [
+        # По стандарту MSX для объектов типа menu корневой массив обязан называться 'menu'!
+        "menu": [
             {
                 "id": "search_btn",
                 "title": "🔍 Искать фильм или сериал",
-                "icon": "https://lh1.in", # Иконка обязательна!
+                "icon": "search", 
                 "data": f"{base_url}/search_page"
             },
             {
                 "id": "news_btn",
                 "title": "🔥 Новинки на главной",
-                "icon": "https://lh1.in", # Иконка обязательна!
+                "icon": "auto-awesome", 
                 "data": f"{base_url}/page/1"
             }
         ]
@@ -65,7 +65,7 @@ def msx_search_page():
             {
                 "title": "Нажмите ОК для ввода названия",
                 "input": f"{base_url}/search?query={{input}}",
-                "icon": "https://lh1.in"
+                "icon": "search"
             }
         ]
     })
@@ -140,7 +140,6 @@ def list_movies(page_num=1):
                 "playlist": f"{base_url}/movie?url={encoded_url}"
             })
             
-    # Кнопка перехода на следующую страницу контента
     next_page = page_num + 1
     next_url = f"{base_url}/search?query={query}&page={next_page}" if query else f"{base_url}/page/{next_page}"
     msx_json["items"].append({
@@ -176,14 +175,12 @@ def movie_detail():
     msx_json = {"name": "Выбор контента", "type": "list", "items": []}
     
     if is_creative_series:
-        # Если сериал — строим сетку из 4 сезонов (универсальный шаблон)
         for s in range(1, 5): 
             msx_json["items"].append({
                 "title": f"Сезон {s}",
                 "playlist": f"{base_url}/series-episodes?path={urllib.parse.quote_plus(video_path)}&token={token}&season={s}"
             })
     else:
-        # Если фильм — выводим доступные качества видеофайла
         msx_json["items"] = [
             {"title": "Смотреть в 1080p", "video": f"https://cinemap.cc{token}/{video_path}/1080.mp4"},
             {"title": "Смотреть в 720p", "video": f"https://cinemap.cc{token}/{video_path}/720.mp4"},
@@ -199,7 +196,6 @@ def series_episodes():
     season = request.args.get('season')
     
     msx_json = {"name": f"Сезон {season}", "type": "list", "items": []}
-    # Генерируем стандартный список на 24 серии
     for ep in range(1, 25):
         msx_json["items"].append({
             "title": f"Серия {ep}",
