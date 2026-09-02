@@ -51,23 +51,27 @@ def msx_system_handshake():
 @app.route('/tv_menu')
 @app.route('/tv')
 def msx_display_main_menu():
-    """Само главное меню с поиском и новинками"""
+    """Главное меню (Menu Object), которое открывает списки контента"""
     base_url = request.host_url.rstrip('/')
     
+    # Формат Menu Object строго требует корневой тип 'menu'
     msx_json = {
         "name": "Мой Кинотеатр Kinogo",
-        "type": "list",
-        "headline": "Добро пожаловать",
+        "type": "menu", 
         "items": [
             {
-                "title": "🔍 Искать фильм или сериал",
-                "input": f"{base_url}/search?query={{input}}",
-                "icon": "https://lh1.in"
+                "id": "search_block",
+                "title": "🔍 Поиск",
+                "icon": "https://lh1.in",
+                # При клике открывается текстовый ввод, результат которого шлется на /search
+                "data": f"{base_url}/search?query={{input}}"
             },
             {
-                "title": "🔥 Новинки на главной",
-                "playlist": f"{base_url}/page/1",
-                "icon": "https://lh1.in"
+                "id": "news_block",
+                "title": "🔥 Новинки",
+                "icon": "https://lh1.in",
+                # Меню ссылается на список (data) новинок
+                "data": f"{base_url}/page/1"
             }
         ]
     }
