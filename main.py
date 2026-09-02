@@ -34,6 +34,8 @@ def get_player_tokens(embed_url):
         return None, None
 
 @app.route('/')
+@app.route('/tv')
+@app.route('/index.html')
 def main_menu():
     """Главное меню с поиском и категориями"""
     base_url = request.host_url.rstrip('/')
