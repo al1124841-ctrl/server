@@ -12,21 +12,35 @@ HEADERS = {
     "Referer": HOST + "/"
 }
 
-# --- ПОЛНОСТЬЮ ИСПРАВЛЕННЫЙ СТАРТОВЫЙ БЛОК ---
+# --- ПОЛНОСТЬЮ СКОРРЕКТИРОВАННЫЙ БЛОК АВТОРИЗАЦИИ И МЕНЮ ---
 
 @app.route('/')
 @app.route('/msx/start.json')
 def msx_system_handshake():
     """
-    Прямой ответ для телевизора.
-    Больше никаких перенаправлений! Сразу отдаем структуру меню здесь.
+    Системный ответ для Media Station X.
+    Говорит телевизору: 'Всё ок, загрузи плейлист по этой ссылке'.
     """
     base_url = request.host_url.rstrip('/')
     
-    # Прямой, плоский JSON, который MSX понимает мгновенно без ошибок контента
+    # Свойство 'parameter' указывает, какую команду выполнить при старте.
+    # Команда 'playlist:' заставит MSX открыть обычный, стабильный список папок.
     return jsonify({
+        "name": "Мой Кинотеатр",
+        "version": "1.0.0",
+        "icon": "https://lh1.in",
+        "parameter": f"playlist:{base_url}/tv_playlist" # Ссылка на наше меню
+    })
+
+@app.route('/tv_playlist')
+@app.route('/tv')
+def msx_display_main_menu():
+    """Само главное меню, оформленное в виде классического списка MSX"""
+    base_url = request.host_url.rstrip('/')
+    
+    msx_json = {
         "name": "Кинотеатр Kinogo",
-        "type": "list",
+        "type": "list", # Классический плиточный интерфейс
         "headline": "Главное меню",
         "items": [
             {
@@ -40,9 +54,10 @@ def msx_system_handshake():
                 "icon": "https://lh1.in"
             }
         ]
-    })
+    }
+    return jsonify(msx_json)
 
-# --- ОСТАЛЬНОЙ ФУНКЦИОНАЛ ПАРСИНГА САЙТА (БЕЗ ИЗМЕНЕНИЙ) ---
+# --- ОСТАЛЬНОЙ ФУНКЦИОНАЛ ПАРСИНГА САЙТА ---
 
 def get_player_tokens(embed_url):
     try:
