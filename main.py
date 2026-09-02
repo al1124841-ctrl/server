@@ -36,6 +36,7 @@ def get_player_tokens(embed_url):
 @app.route('/')
 @app.route('/tv')
 @app.route('/msx.json')
+@app.route('/msx/start.json')
 @app.route('/index.html')
 def main_menu():
     """Главное меню с поиском и категориями"""
