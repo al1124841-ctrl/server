@@ -13,25 +13,25 @@ HEADERS = {
 }
 
 # ==============================================================================
-# 1. THE STABLE WORKING MENU CONFIGURATION (KEEPS YOUR TWO WORKING ICONS)
+# 1. ТОТ САМЫЙ ВАШ РАБОЧИЙ ВАРИАНТ МЕНЮ С ИКОНКАМИ
 # ==============================================================================
 
 @app.route('/')
 @app.route('/msx/start.json')
 def msx_system_handshake():
-    """Initial system handshake. Points MSX directly to the menu object."""
+    """Служебный старт. Авторизует ТВ и направляет его на корневое меню."""
     base_url = request.host_url.rstrip('/')
     return jsonify({
         "name": "Мой Кинотеатр",
         "version": "1.0.0",
         "icon": "https://lh1.in",
-        "parameter": f"menu:{base_url}/main_menu"
+        "parameter": f"menu:{base_url}/main_menu"  # Этот параметр у вас работал!
     })
 
 @app.route('/main_menu')
 @app.route('/tv_menu')
 def msx_display_main_menu():
-    """Root application menu structure. This part successfully rendered your icons."""
+    """Корневое меню приложения (блок, который успешно вывел иконки на ТВ)."""
     base_url = request.host_url.rstrip('/')
     return jsonify({
         "name": "Кинотеатр Kinogo",
@@ -53,31 +53,28 @@ def msx_display_main_menu():
     })
 
 # ==============================================================================
-# 2. FIXED CONTENT ENDPOINTS (WRAPPED TO FIX 'CONTENT NOT AVAILABLE')
+# 2. ОЧИЩЕННЫЙ БЛОК КОНТЕНТА (ОТДАЕТ СТАНДАРТНЫЙ ЛИНЕЙНЫЙ JSON БЕЗ СЛОЖНЫХ СТРУКТУР)
 # ==============================================================================
 
 @app.route('/search_page')
 def msx_search_page():
-    """Generates the input option panel inside the search menu tab."""
+    """Экран ввода, который активирует клавиатуру поиска."""
     base_url = request.host_url.rstrip('/')
     return jsonify({
-        "content": {
-            "name": "Поиск по сайту",
-            "type": "list",
-            "items": [
-                {
-                    "title": "Нажмите ОК для ввода названия",
-                    "input": f"{base_url}/search?query={{input}}",
-                    "icon": "https://lh1.in"
-                }
-            ]
-        }
+        "type": "list",
+        "items": [
+            {
+                "title": "Нажмите OK для ввода названия",
+                "input": f"{base_url}/search?query={{input}}",
+                "icon": "https://lh1.in"
+            }
+        ]
     })
 
 @app.route('/search')
 @app.route('/page/<int:page_num>')
 def list_movies(page_num=1):
-    """Parses movie grids and delivers them nested properly inside a 'content' object."""
+    """Выводит сетку фильмов в виде стандартного чистого списка."""
     base_url = request.host_url.rstrip('/')
     query = request.args.get('query')
     
@@ -98,7 +95,11 @@ def list_movies(page_num=1):
     soup = BeautifulSoup(response.text, 'html.parser')
     items = soup.find_all('div', class_='shortstory') or soup.find_all('div', class_='zagolovki')
     
-    movie_items = []
+    msx_json = {
+        "name": f"Поиск: {query}" if query else f"Страница {page_num}",
+        "type": "list",
+        "items": []
+    }
     
     for item in items:
         link_tag = item.find('a')
@@ -109,36 +110,28 @@ def list_movies(page_num=1):
             img_url = HOST + img_tag['src'] if img_tag['src'].startswith('/') else img_tag['src']
             encoded_url = urllib.parse.quote_plus(movie_url)
             
-            movie_items.append({
+            msx_json["items"].append({
                 "title": title,
                 "icon": img_url,
                 "playlist": f"{base_url}/movie?url={encoded_url}"
             })
             
-    # Next page navigation element
+    # Кнопка перехода на следующую страницу контента
     next_page = page_num + 1
     next_url = f"{base_url}/search?query={query}&page={next_page}" if query else f"{base_url}/page/{next_page}"
-    movie_items.append({
+    msx_json["items"].append({
         "title": "➡️ Следующая страница",
         "playlist": next_url
     })
-    
-    # Crucial layout structure: wrapped inside 'content' for tab items compatibility
-    return jsonify({
-        "content": {
-            "name": f"Поиск: {query}" if query else f"Страница {page_num}",
-            "type": "list",
-            "items": movie_items
-        }
-    })
+    return jsonify(msx_json)
 
 # ==============================================================================
-# 3. MOVIE RESOLUTION & EPISODES SELECTION
+# 3. БЛОК ДЕТАЛИЗАЦИИ ФИЛЬМА И ВЫБОРА СЕРИЙ/КАЧЕСТВА
 # ==============================================================================
 
 @app.route('/movie')
 def movie_detail():
-    """Parses streaming sources and maps qualities/seasons."""
+    """Определяет тип контента (фильм/сериал) и генерирует ссылки на видео."""
     base_url = request.host_url.rstrip('/')
     movie_url = urllib.parse.unquote_plus(request.args.get('url'))
     
@@ -178,7 +171,7 @@ def movie_detail():
 
 @app.route('/series-episodes')
 def series_episodes():
-    """Generates standard list of episodes for multi-season titles."""
+    """Выводит список серий для выбранного сезона сериала."""
     path = urllib.parse.unquote_plus(request.args.get('path'))
     token = request.args.get('token')
     season = request.args.get('season')
