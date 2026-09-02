@@ -13,7 +13,7 @@ HEADERS = {
 }
 
 # ==============================================================================
-# 1. СТАРТОВЫЙ БЛОК: СТРОГИЙ СТАНДАРТ MSX (МЕНЮ СЛЕВА РАБОТАЕТ ИДЕАЛЬНО)
+# 1. ЗАФИКСИРОВАННЫЙ СТАРТОВЫЙ БЛОК (РАБОТАЕТ СТАБИЛЬНО)
 # ==============================================================================
 
 @app.route('/')
@@ -49,7 +49,7 @@ def msx_display_main_menu():
     })
 
 # ==============================================================================
-# 2. ИСПРАВЛЕННЫЙ БЛОК КОНТЕНТА (ЗАМЕНА PLAYLIST НА DATA ДЛЯ ФОКУСА ПУЛЬТА)
+# 2. ИСПРАВЛЕННЫЙ БЛОК КОНТЕНТА ВО ВКЛАДКАХ (ФИКС "NO SELECTABLE ITEMS")
 # ==============================================================================
 
 @app.route('/search_page')
@@ -72,7 +72,7 @@ def msx_search_page():
 @app.route('/search')
 @app.route('/page/<int:page_num>')
 def list_movies(page_num=1):
-    """Выводит сетку фильмов. Замена 'playlist' на 'data' активирует пульт."""
+    """Выводит сетку фильмов с явным указанием интерактивного действия."""
     base_url = request.host_url.rstrip('/')
     query = request.args.get('query')
     
@@ -107,8 +107,8 @@ def list_movies(page_num=1):
             movie_items.append({
                 "title": title,
                 "icon": img_url,
-                # Использование 'data' вместо 'playlist' делает карточку кликабельной!
-                "data": f"{base_url}/movie?url={encoded_url}"
+                # Комбинация execute: и link: принудительно заставляет пульт кликать по карточкам
+                "action": f"execute:link:{base_url}/movie?url={encoded_url}"
             })
             
     # Кнопка перехода на следующую страницу
@@ -116,7 +116,7 @@ def list_movies(page_num=1):
     next_url = f"{base_url}/search?query={query}&page={next_page}" if query else f"{base_url}/page/{next_page}"
     movie_items.append({
         "title": "➡️ Следующая страница",
-        "data": next_url
+        "action": f"execute:link:{next_url}"
     })
     
     return jsonify({
@@ -173,20 +173,19 @@ def movie_detail():
 
     is_creative_series = "tvseries" in video_path or "season" in res.text.lower() or "серия" in res.text.lower()
     
-    # Для внутренних страниц контента (выбор серий/качества) тоже возвращаем формат pages
     movie_menu = []
     
     if is_creative_series:
         for s in range(1, 5): 
             movie_menu.append({
                 "title": f"Сезон {s}",
-                "data": f"{base_url}/series-episodes?path={urllib.parse.quote_plus(video_path)}&token={token}&season={s}"
+                "action": f"execute:link:{base_url}/series-episodes?path={urllib.parse.quote_plus(video_path)}&token={token}&season={s}"
             })
     else:
         movie_menu = [
-            {"title": "Смотреть в 1080p", "video": f"https://cinemap.cc{token}/{video_path}/1080.mp4"},
-            {"title": "Смотреть в 720p", "video": f"https://cinemap.cc{token}/{video_path}/720.mp4"},
-            {"title": "Смотреть в 480p", "video": f"https://cinemap.cc{token}/{video_path}/480.mp4"}
+            {"title": "Смотреть в 1080p", "action": f"video:https://cinemap.cc{token}/{video_path}/1080.mp4"},
+            {"title": "Смотреть в 720p", "action": f"video:https://cinemap.cc{token}/{video_path}/720.mp4"},
+            {"title": "Смотреть в 480p", "action": f"video:https://cinemap.cc{token}/{video_path}/480.mp4"}
         ]
     return jsonify({
         "pages": [{
@@ -205,7 +204,7 @@ def series_episodes():
     for ep in range(1, 25):
         episodes_menu.append({
             "title": f"Серия {ep}",
-            "video": f"https://cinemap.cc{token}/{path}/...ВыборКачества"
+            "action": f"video:https://cinemap.cc{token}/{path}/...ВыборКачества"
         })
         
     return jsonify({
