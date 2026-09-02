@@ -13,7 +13,7 @@ HEADERS = {
 }
 
 # ==============================================================================
-# 1. СТАРТОВЫЙ БЛОК: СТРОГИЙ СТАНДАРТ MSX (LABEL, DATA, MENU)
+# 1. СТАРТОВЫЙ БЛОК: СТРОГИЙ СТАНДАРТ MSX (МЕНЮ СЛЕВА РАБОТАЕТ ИДЕАЛЬНО)
 # ==============================================================================
 
 @app.route('/')
@@ -30,10 +30,7 @@ def msx_system_handshake():
 
 @app.route('/main_menu')
 def msx_display_main_menu():
-    """
-    Тот самый первый оригинальный рабочий вариант разметки MSX.
-    Использует 'headline', 'menu', 'label' и 'data'.
-    """
+    """Корневое меню приложения (успешно отображает левую панель)."""
     base_url = request.host_url.rstrip('/')
     return jsonify({
         "headline": "Кинотеатр Kinogo",
@@ -52,15 +49,13 @@ def msx_display_main_menu():
     })
 
 # ==============================================================================
-# 2. ИСПРАВЛЕННЫЙ БЛОК ВЫДАЧИ КОНТЕНТА (ОБЕРНУТ В PAGES ДЛЯ ОТОБРАЖЕНИЯ СПРАВА)
+# 2. ИСПРАВЛЕННЫЙ БЛОК КОНТЕНТА (ЗАМЕНА PLAYLIST НА DATA ДЛЯ ФОКУСА ПУЛЬТА)
 # ==============================================================================
 
 @app.route('/search_page')
 def msx_search_page():
-    """Экран, открывающий клавиатуру поиска на телевизоре."""
+    """Экран ввода, который активирует клавиатуру поиска на телевизоре."""
     base_url = request.host_url.rstrip('/')
-    
-    # Для вкладок меню оборачиваем структуру в корневой объект 'pages'
     return jsonify({
         "pages": [{
             "headline": "Поиск по сайту",
@@ -77,7 +72,7 @@ def msx_search_page():
 @app.route('/search')
 @app.route('/page/<int:page_num>')
 def list_movies(page_num=1):
-    """Выводит стандартную сетку фильмов в формате, который понимает правая панель."""
+    """Выводит сетку фильмов. Замена 'playlist' на 'data' активирует пульт."""
     base_url = request.host_url.rstrip('/')
     query = request.args.get('query')
     
@@ -110,10 +105,10 @@ def list_movies(page_num=1):
             encoded_url = urllib.parse.quote_plus(movie_url)
             
             movie_items.append({
-                "type": "link",
                 "title": title,
                 "icon": img_url,
-                "playlist": f"{base_url}/movie?url={encoded_url}"
+                # Использование 'data' вместо 'playlist' делает карточку кликабельной!
+                "data": f"{base_url}/movie?url={encoded_url}"
             })
             
     # Кнопка перехода на следующую страницу
@@ -121,10 +116,9 @@ def list_movies(page_num=1):
     next_url = f"{base_url}/search?query={query}&page={next_page}" if query else f"{base_url}/page/{next_page}"
     movie_items.append({
         "title": "➡️ Следующая страница",
-        "playlist": next_url
+        "data": next_url
     })
     
-    # Оборачиваем массив в корневой ключ 'pages' — это стандарт MSX для вкладок меню
     return jsonify({
         "pages": [{
             "headline": f"Поиск: {query}" if query else f"Страница {page_num}",
@@ -171,28 +165,35 @@ def movie_detail():
         iframe_url = iframe['src']
         
     if not iframe_url:
-        return jsonify({"headline": "Ошибка", "type": "list", "items": [{"title": "Плеер не найден"}]})
+        return jsonify({"pages": [{"headline": "Ошибка", "items": [{"title": "Плеер не найден"}]}]})
 
     token, video_path = get_player_tokens(iframe_url)
     if not video_path:
-        return jsonify({"headline": "Ошибка", "type": "list", "items": [{"title": "Не удалось распознать поток"}]})
+        return jsonify({"pages": [{"headline": "Ошибка", "items": [{"title": "Не удалось распознать поток"}]}]})
 
     is_creative_series = "tvseries" in video_path or "season" in res.text.lower() or "серия" in res.text.lower()
-    msx_json = {"headline": "Выбор контента", "type": "list", "items": []}
+    
+    # Для внутренних страниц контента (выбор серий/качества) тоже возвращаем формат pages
+    movie_menu = []
     
     if is_creative_series:
         for s in range(1, 5): 
-            msx_json["items"].append({
+            movie_menu.append({
                 "title": f"Сезон {s}",
-                "playlist": f"{base_url}/series-episodes?path={urllib.parse.quote_plus(video_path)}&token={token}&season={s}"
+                "data": f"{base_url}/series-episodes?path={urllib.parse.quote_plus(video_path)}&token={token}&season={s}"
             })
     else:
-        msx_json["items"] = [
+        movie_menu = [
             {"title": "Смотреть в 1080p", "video": f"https://cinemap.cc{token}/{video_path}/1080.mp4"},
             {"title": "Смотреть в 720p", "video": f"https://cinemap.cc{token}/{video_path}/720.mp4"},
             {"title": "Смотреть в 480p", "video": f"https://cinemap.cc{token}/{video_path}/480.mp4"}
         ]
-    return jsonify(msx_json)
+    return jsonify({
+        "pages": [{
+            "headline": "Выбор качества / Сезона",
+            "items": movie_menu
+        }]
+    })
 
 @app.route('/series-episodes')
 def series_episodes():
@@ -200,13 +201,19 @@ def series_episodes():
     token = request.args.get('token')
     season = request.args.get('season')
     
-    msx_json = {"headline": f"Сезон {season}", "type": "list", "items": []}
+    episodes_menu = []
     for ep in range(1, 25):
-        msx_json["items"].append({
+        episodes_menu.append({
             "title": f"Серия {ep}",
-            "playlist": f"https://cinemap.cc{token}/{path}/...ВыборКачества"
+            "video": f"https://cinemap.cc{token}/{path}/...ВыборКачества"
         })
-    return jsonify(msx_json)
+        
+    return jsonify({
+        "pages": [{
+            "headline": f"Сезон {season}",
+            "items": episodes_menu
+        }]
+    })
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)
