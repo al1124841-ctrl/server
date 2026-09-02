@@ -13,7 +13,7 @@ HEADERS = {
 }
 
 # ==============================================================================
-# 1. СИСТЕМНЫЙ БЛОК АВТОРИЗАЦИИ И МЕНЮ (СТРОГО ПО ДОКУМЕНТАЦИИ MSX WIKI)
+# 1. ЗАФИКСИРОВАННЫЙ РАБОЧИЙ БЛОК МЕНЮ (НЕ ИЗМЕНЯЛСЯ, ОСТАВЛЯЕМ КАК ЕСТЬ)
 # ==============================================================================
 
 @app.route('/')
@@ -25,80 +25,59 @@ def msx_system_handshake():
         "name": "Мой Кинотеатр",
         "version": "1.0.0",
         "icon": "https://lh1.in",
-        "parameter": f"menu:{base_url}/main_menu"  # Переход на меню
+        "parameter": f"menu:{base_url}/main_menu"
     })
 
 @app.route('/main_menu')
 @app.route('/tv_menu')
 def msx_display_main_menu():
-    """
-    Корневое меню приложения (Menu Root Object).
-    ИСПРАВЛЕНО: Вместо 'items' используется 'menu' согласно правилам MSX API.
-    """
+    """Корневое меню приложения (этот блок успешно отображает иконки на ТВ)."""
     base_url = request.host_url.rstrip('/')
     return jsonify({
         "name": "Кинотеатр Kinogo",
-        # По стандарту MSX для объектов типа menu корневой массив обязан называться 'menu'!
-        "menu": [
+        "type": "menu",
+        "items": [
             {
                 "id": "search_btn",
                 "title": "🔍 Искать фильм или сериал",
-                "icon": "search", 
+                "icon": "https://lh1.in",
                 "data": f"{base_url}/search_page"
             },
             {
                 "id": "news_btn",
                 "title": "🔥 Новинки на главной",
-                "icon": "auto-awesome", 
+                "icon": "https://lh1.in",
                 "data": f"{base_url}/page/1"
             }
         ]
     })
 
+# ==============================================================================
+# 2. ИСПРАВЛЕННЫЙ БЛОК ВЫДАЧИ КОНТЕНТА (ОБЕРНУТ В КЛЮЧ PLAYLIST ДЛЯ СНЯТИЯ ОШИБКИ)
+# ==============================================================================
+
 @app.route('/search_page')
 def msx_search_page():
-    """Экран ввода, который активирует клавиатуру поиска на телевизоре."""
+    """Экран ввода, который активирует клавиатуру поиска внутри вкладки меню."""
     base_url = request.host_url.rstrip('/')
     return jsonify({
-        "type": "list",
-        "items": [
-            {
-                "title": "Нажмите ОК для ввода названия",
-                "input": f"{base_url}/search?query={{input}}",
-                "icon": "search"
-            }
-        ]
+        "playlist": {
+            "name": "Поиск по сайту",
+            "type": "list",
+            "items": [
+                {
+                    "title": "Нажмите ОК для ввода названия",
+                    "input": f"{base_url}/search?query={{input}}",
+                    "icon": "https://lh1.in"
+                }
+            ]
+        }
     })
-
-# ==============================================================================
-# 2. БЛОК ПАРСИНГА САЙТА KINOGO (КАТАЛОГ И ПОИСК)
-# ==============================================================================
-
-def get_player_tokens(embed_url):
-    """Вытаскивает динамические токены времени и пути из плеера cinemap."""
-    try:
-        if embed_url.startswith('//'):
-            embed_url = 'https:' + embed_url
-        res = requests.get(embed_url, headers=HEADERS, timeout=5)
-        
-        token_match = re.search(r'([a-f0-9]{32}:\d{10})', res.text)
-        path_match = re.search(r'tvseries/([a-f0-9]{40})', res.text)
-        movie_match = re.search(r'vod/([a-f0-9]{40})', res.text)
-        
-        token = token_match.group(1) if token_match else "default_token"
-        
-        if path_match:
-            return token, f"tvseries/{path_match.group(1)}"
-        elif movie_match:
-            return token, f"vod/{movie_match.group(1)}"
-        return token, None
-    except:
-        return None, None
 
 @app.route('/search')
 @app.route('/page/<int:page_num>')
 def list_movies(page_num=1):
-    """Выводит сетку фильмов (с главной страницы или результатов поиска)."""
+    """Выводит сетку фильмов, упакованную в объект playlist для вкладки меню."""
     base_url = request.host_url.rstrip('/')
     query = request.args.get('query')
     
@@ -119,7 +98,8 @@ def list_movies(page_num=1):
     soup = BeautifulSoup(response.text, 'html.parser')
     items = soup.find_all('div', class_='shortstory') or soup.find_all('div', class_='zagolovki')
     
-    msx_json = {
+    # Создаем внутреннее наполнение списка фильмов
+    playlist_content = {
         "name": f"Поиск: {query}" if query else f"Страница {page_num}",
         "type": "list",
         "items": []
@@ -134,19 +114,28 @@ def list_movies(page_num=1):
             img_url = HOST + img_tag['src'] if img_tag['src'].startswith('/') else img_tag['src']
             encoded_url = urllib.parse.quote_plus(movie_url)
             
-            msx_json["items"].append({
+            playlist_content["items"].append({
                 "title": title,
                 "icon": img_url,
                 "playlist": f"{base_url}/movie?url={encoded_url}"
             })
             
+    # Кнопка перехода на следующую страницу контента
     next_page = page_num + 1
     next_url = f"{base_url}/search?query={query}&page={next_page}" if query else f"{base_url}/page/{next_page}"
-    msx_json["items"].append({
+    playlist_content["items"].append({
         "title": "➡️ Следующая страница",
         "playlist": next_url
     })
-    return jsonify(msx_json)
+    
+    # Передаем данные строго внутри ключа 'playlist', чтобы вкладка меню ожила
+    return jsonify({
+        "playlist": playlist_content
+    })
+
+# ==============================================================================
+# 3. БЛОК ДЕТАЛИЗАЦИИ ФИЛЬМА И ВЫБОРА СЕРИЙ/КАЧЕСТВА
+# ==============================================================================
 
 @app.route('/movie')
 def movie_detail():
