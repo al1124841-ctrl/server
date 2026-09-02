@@ -43,7 +43,9 @@ def msx_system_handshake():
         "name": "Мой Кинотеатр",
         "version": "1.0.0",
         "icon": "https://lh1.in",
-        "menu": f"{base_url}/tv_menu"  # Перенаправляем на уникальный роут
+        # Говорим телевизору, что наше меню — это готовый список (обязательно для MSX)
+        "type": "list", 
+        "menu": f"{base_url}/tv_menu"
     })
 
 @app.route('/tv_menu')
@@ -54,7 +56,8 @@ def msx_display_main_menu():
     
     msx_json = {
         "name": "Мой Кинотеатр Kinogo",
-        "type": "list",
+        "type": "list", # Строго указываем тип объекта
+        "headline": "Добро пожаловать", # Добавляем подзаголовок
         "items": [
             {
                 "title": "🔍 Искать фильм или сериал",
@@ -63,7 +66,8 @@ def msx_display_main_menu():
             },
             {
                 "title": "🔥 Новинки на главной",
-                "playlist": f"{base_url}/page/1"
+                "playlist": f"{base_url}/page/1",
+                "icon": "https://lh1.in"
             }
         ]
     }
