@@ -110,6 +110,7 @@ def list_movies(page_num=1):
             encoded_url = urllib.parse.quote_plus(movie_url)
             
             movie_items.append({
+                "type": "link",
                 "title": title,
                 "icon": img_url,
                 "playlist": f"{base_url}/movie?url={encoded_url}"
