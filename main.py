@@ -12,52 +12,37 @@ HEADERS = {
     "Referer": HOST + "/"
 }
 
-# --- ИСПРАВЛЕННЫЙ СТАРТОВЫЙ БЛОК ДЛЯ СНЯТИЯ ОШИБКИ MENU ---
+# --- ПОЛНОСТЬЮ ИСПРАВЛЕННЫЙ СТАРТОВЫЙ БЛОК ---
 
 @app.route('/')
 @app.route('/msx/start.json')
 def msx_system_handshake():
-    """Системный ответ для первой авторизации телевизора в MSX"""
+    """
+    Прямой ответ для телевизора.
+    Больше никаких перенаправлений! Сразу отдаем структуру меню здесь.
+    """
     base_url = request.host_url.rstrip('/')
     
+    # Прямой, плоский JSON, который MSX понимает мгновенно без ошибок контента
     return jsonify({
-        "name": "Мой Кинотеатр",
-        "version": "1.0.0",
-        "icon": "https://lh1.in",
-        # МЕНЯЕМ 'menu:' на 'content:'. Это заставит MSX открыть меню как красивую страницу
-        "parameter": f"content:{base_url}/tv_menu" 
+        "name": "Кинотеатр Kinogo",
+        "type": "list",
+        "headline": "Главное меню",
+        "items": [
+            {
+                "title": "🔍 Искать фильм или сериал",
+                "input": f"{base_url}/search?query={{input}}",
+                "icon": "https://lh1.in"
+            },
+            {
+                "title": "🔥 Новинки на главной",
+                "playlist": f"{base_url}/page/1",
+                "icon": "https://lh1.in"
+            }
+        ]
     })
 
-@app.route('/tv_menu')
-@app.route('/tv')
-def msx_display_main_menu():
-    """Главный экран приложения, обернутый по правилам контента MSX"""
-    base_url = request.host_url.rstrip('/')
-    
-    # MSX требует, чтобы при передаче через 'content:' 
-    # вся структура плейлиста/списка лежала строго внутри ключа 'content'
-    msx_json = {
-        "content": {
-            "name": "Кинотеатр Kinogo",
-            "type": "list",
-            "headline": "Главное меню",
-            "items": [
-                {
-                    "title": "🔍 Искать фильм или сериал",
-                    "input": f"{base_url}/search?query={{input}}",
-                    "icon": "https://lh1.in"
-                },
-                {
-                    "title": "🔥 Новинки на главной",
-                    "playlist": f"{base_url}/page/1",
-                    "icon": "https://lh1.in"
-                }
-            ]
-        }
-    }
-    return jsonify(msx_json)
-
-# --- ОСТАЛЬНОЙ ФУНКЦИОНАЛ ПАРСИНГА САЙТА ---
+# --- ОСТАЛЬНОЙ ФУНКЦИОНАЛ ПАРСИНГА САЙТА (БЕЗ ИЗМЕНЕНИЙ) ---
 
 def get_player_tokens(embed_url):
     try:
