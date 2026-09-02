@@ -39,13 +39,13 @@ def msx_system_handshake():
     """Системный ответ для первой авторизации телевизора в MSX"""
     base_url = request.host_url.rstrip('/')
     
+    # MSX строго требует именно такую структуру Start Object
     return jsonify({
         "name": "Мой Кинотеатр",
         "version": "1.0.0",
         "icon": "https://lh1.in",
-        # Говорим телевизору, что наше меню — это готовый список (обязательно для MSX)
-        "type": "list", 
-        "menu": f"{base_url}/tv_menu"
+        # Передаем ссылку на меню в параметре 'parameter' (ЭТО ИСПРАВИТ ОШИБКУ!)
+        "parameter": f"menu:{base_url}/tv_menu" 
     })
 
 @app.route('/tv_menu')
@@ -56,8 +56,8 @@ def msx_display_main_menu():
     
     msx_json = {
         "name": "Мой Кинотеатр Kinogo",
-        "type": "list", # Строго указываем тип объекта
-        "headline": "Добро пожаловать", # Добавляем подзаголовок
+        "type": "list",
+        "headline": "Добро пожаловать",
         "items": [
             {
                 "title": "🔍 Искать фильм или сериал",
@@ -72,6 +72,7 @@ def msx_display_main_menu():
         ]
     }
     return jsonify(msx_json)
+
 
 
 @app.route('/search')
